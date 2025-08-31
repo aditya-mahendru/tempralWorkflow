@@ -31,7 +31,7 @@ class OrderWorkflow:
             self._order_data = await workflow.execute_activity(
                 order_received,
                 order_id,
-                start_to_close_timeout=timedelta(minutes=5),
+                start_to_close_timeout=timedelta(seconds=30),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=1),
                     maximum_interval=timedelta(minutes=1),
@@ -93,12 +93,7 @@ class OrderWorkflow:
             
             # Step 5: Execute Shipping Workflow (Child Workflow)
             self._workflow_status = "shipping"
-            # shipping_order = {
-                # **self._order_data,
-            #     "shipping_address": self._shipping_address,
-            #     "payment_id": payment_id
-            # }
-            
+
             self._shipping_result = await workflow.execute_child_workflow(
                 ShippingWorkflow.run,
                 self._order_data,

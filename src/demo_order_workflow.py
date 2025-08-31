@@ -61,12 +61,12 @@ async def demo_cancellation():
     
     client = await Client.connect("localhost:7233")
     
-    order_id = f"CANCEL-{int(time.time())}"
+    order_id = str(uuid.uuid4())
     print(f"Starting order workflow for cancellation demo: {order_id}")
     
     handle = await client.start_workflow(
         "OrderWorkflow",
-        [order_id,"789 Cancel St, City, State 12345"],  
+        args=[order_id,"789 Cancel St, City, State 12345"],  
         id=f"cancel-{order_id}",
         task_queue="order-tq",
     )

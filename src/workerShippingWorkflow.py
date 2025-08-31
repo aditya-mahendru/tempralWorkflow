@@ -1,9 +1,7 @@
 import asyncio
 from temporalio.client import Client
 from temporalio.worker import Worker
-from workflows.orderWorkflow import OrderWorkflow
 from workflows.shippingWorkflow import ShippingWorkflow
-from activities.orderActivities import order_received, order_validated, payment_charged
 from activities.shippingActivities import package_prepared, carrier_dispatched
 
 async def main():
