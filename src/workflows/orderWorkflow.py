@@ -103,6 +103,7 @@ class OrderWorkflow:
                 ShippingWorkflow.run,
                 self._order_data,
                 id=f"shipping-{order_id}",
+                task_queue="shipping-tq",
                 # start_to_close_timeout=timedelta(hours=2),
                 # retry_policy=RetryPolicy(
                 #     initial_interval=timedelta(minutes=1),
