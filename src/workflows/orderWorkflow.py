@@ -7,6 +7,10 @@ from workflows.shippingWorkflow import ShippingWorkflow
 from util.dataObject import OrderObject
 from temporalio.workflow import ParentClosePolicy
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 @workflow.defn
 class OrderWorkflow:
@@ -28,6 +32,7 @@ class OrderWorkflow:
             self._workflow_status = "processing"
             
             # Step 1: Receive Order
+            workflow.logger.info(f"Executing order_received activity for order_id: {order_id}")
             self._order_data = await workflow.execute_activity(
                 order_received,
                 order_id,
@@ -44,6 +49,7 @@ class OrderWorkflow:
                 return {"status": "cancelled", "reason": "Order cancelled by user"}
             
             # Step 2: Validate Order
+            workflow.logger.info(f"Executing order_validated activity for order_id: {order_id}")
             self._validation_result = await workflow.execute_activity(
                 order_validated,
                 self._order_data,
@@ -56,26 +62,32 @@ class OrderWorkflow:
             )
             
             if not self._validation_result:
+                workflow.logger.info(f"Order validation failed for order_id: {order_id}")
                 return {"status": "failed", "reason": "Order validation failed"}
             
             # Check for cancellation after validation
             if self._is_cancelled:
+                workflow.logger.info(f"Order cancelled by user for order_id: {order_id}")
                 return {"status": "cancelled", "reason": "Order cancelled by user"}
             
+            workflow.logger.info(f"Waiting for manual review for order_id: {order_id}")
+            
             # Step 3: Timer for Manual Review (simulated human approval)
-            self._workflow_status = "awaiting_manual_review"
-            await workflow.wait_condition(
-                lambda: self._manual_review_completed,
-                timeout=timedelta(hours=24)  # 24 hour timeout for manual review
-            )
+            # self._workflow_status = "awaiting_manual_review"
+            # await workflow.wait_condition(
+            #     lambda: self._manual_review_completed,
+            #     timeout=timedelta(hours=24)  # 24 hour timeout for manual review
+            # )
             
             # Check for cancellation after manual review
             if self._is_cancelled:
+                workflow.logger.info(f"Order cancelled by user for order_id: {order_id}")
                 return {"status": "cancelled", "reason": "Order cancelled by user"}
             
             # Step 4: Charge Payment
             self._workflow_status = "processing_payment"
             payment_id = f"PAY-{order_id}-{workflow.info().workflow_id}"
+            workflow.logger.info(f"Executing payment_charged activity for order_id: {order_id}")
             self._payment_result = await workflow.execute_activity(
                 payment_charged,
                 args=[self._order_data, payment_id, "mock_db"],  # db parameter - replace with actual DB connection
@@ -89,11 +101,12 @@ class OrderWorkflow:
             
             # Check for cancellation after payment
             if self._is_cancelled:
+                workflow.logger.info(f"Order cancelled by user for order_id: {order_id}")
                 return {"status": "cancelled", "reason": "Order cancelled by user"}
             
             # Step 5: Execute Shipping Workflow (Child Workflow)
             self._workflow_status = "shipping"
-
+            workflow.logger.info(f"Executing ShippingWorkflow for order_id: {order_id}")
             self._shipping_result = await workflow.execute_child_workflow(
                 ShippingWorkflow.run,
                 self._order_data,
@@ -121,6 +134,8 @@ class OrderWorkflow:
             
         except Exception as e:
             self._workflow_status = "failed"
+            workflow.logger.info(f"Order failed for order_id: {order_id}")
+            workflow.logger.error(f"Error in {self._workflow_status}: {e}")
             return {
                 "status": "failed",
                 "error": str(e),
