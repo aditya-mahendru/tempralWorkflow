@@ -16,7 +16,7 @@ CREATE TABLE payments (
 );
 
 CREATE TABLE events(
-    id int4 PRIMARY KEY AUTOINCREMENT,
+    id int4 GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     order_id UUID NOT NULL,
     type text NOT NULL,
     payload jsonb NOT NULL,

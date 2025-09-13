@@ -1,7 +1,10 @@
 import psycopg2
-from loguru import logger
+from temporalio import workflow
+from dotenv import load_dotenv
+# from loguru import logger
 import os
 
+load_dotenv()
 
 class PostgresDB:
     def __init__(self):
@@ -19,12 +22,12 @@ class PostgresDB:
                 password=os.getenv("DB_PASSWORD")
             )
             self.cursor = self.conn.cursor()
-            logger.info("Connected to PostgreSQL")
+            workflow.logger.info("Connected to PostgreSQL")
         except Exception as e:
-            logger.error(f"Error connecting to PostgreSQL: {e}")
+            workflow.logger.error(f"Error connecting to PostgreSQL: {e}")
             raise e
         
-    def query_executor(self, query, hasReturn:bool=True):
+    async def query_executor(self, query, hasReturn:bool=True):
         try:
             self.cursor.execute(query)
             self.conn.commit()
@@ -34,7 +37,7 @@ class PostgresDB:
             else:
                 return
         except Exception as e:
-            logger.error(f"Error executing query: {e}")
+            workflow.logger.error(f"Error executing query: {e}")
             raise e
     
     def __del__(self):

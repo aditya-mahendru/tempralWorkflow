@@ -3,6 +3,7 @@ import asyncio, random
 async def flaky_call() -> None:
     rand_num = random.random()
     # raise RuntimeError("Forced failure for testing")
+    return
     if rand_num < 0.33:
         raise RuntimeError("Forced failure for testing")
 

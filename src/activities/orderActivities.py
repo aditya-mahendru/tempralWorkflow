@@ -1,8 +1,7 @@
 from typing import Dict, Any
 from util.flakyCall import flaky_call
-from temporalio import activity
+from temporalio import activity,workflow
 from util.dataObject import OrderObject
-from datetime import datetime
 from typing import List
 
 from util.db import PostgresDB
@@ -11,15 +10,15 @@ async def order_received(order_data:List[str]) -> OrderObject:
     data = {"items": [{"sku": "ABC", "qty": 1}],"payment_id":order_data[1]}
     await flaky_call()
     pgDB = PostgresDB()
-    query = f"""INSERT INTO postgres.orders (id, order_data, order_status)
+    query = f"""INSERT INTO orders (id, order_data, order_status)
         VALUES
         {order_data[0]}, {data}, 'Received'"""
-    pgDB.query_executor(query, hasReturn=False)
+    await pgDB.query_executor(query, hasReturn=False)
     return OrderObject(
         id=order_data[0], 
         data=data, 
-        created_at=str(datetime.now()), 
-        updated_at=str(datetime.now()), 
+        created_at=str(workflow.now()), 
+        updated_at=str(workflow.now()), 
         payment_id=order_data[1], 
         shipping_address="")
 
@@ -28,12 +27,12 @@ async def order_received(order_data:List[str]) -> OrderObject:
 async def order_validated(order: OrderObject) -> bool:
     await flaky_call()
     pgDB = PostgresDB()
-    query = f"""UPDATE postgres.orders SET 
+    query = f"""UPDATE orders SET 
     order_status = 'Validated',
     updated_at = CURRENT_TIMESTAMP
     where id  = {order.id}
     """
-    pgDB.query_executor(query,False)
+    await pgDB.query_executor(query,False)
     if not order.data.get("items"):
         return False
     return True
@@ -47,11 +46,17 @@ async def payment_charged(order: OrderObject) -> Dict[str, Any]:
     You must implement your own idempotency logic in the activity or here.
     """
     pgDb = PostgresDB()
-    query =  f""" INSERT INTO postgres.payments (id, order_id, payment_status, amount)
-    VALUES ({order.payment_id}, {order.id}, 1, {order.data.get("amount", 0)})
+    query =  f""" INSERT INTO payments (id, order_id, payment_status, amount)
+    VALUES ({order.payment_id}, {order.id}, 1, {order.data.get("amount", 0)}) ON CONFLICT DO NOTHING
     """
-    # TODO: Implement DB read/write: check payment record, insert/update payment status
+    await pgDb.query_executor(query,False)
+    query = f"""UPDATE orders SET 
+    order_status = 'Charged',
+    updated_at = CURRENT_TIMESTAMP
+    where id  = {order.id}
+    """
+    await pgDb.query_executor(query,False)
+    
     amount = sum(i.get("qty", 1) for i in order.data.get("items", []))
-    pgDb.query_executor(query,False)
     return {"status": "charged", "amount": amount}
 
