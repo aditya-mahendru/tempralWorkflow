@@ -24,11 +24,15 @@ class PostgresDB:
             logger.error(f"Error connecting to PostgreSQL: {e}")
             raise e
         
-    def query_executor(self, query):
+    def query_executor(self, query, hasReturn:bool=True):
         try:
             self.cursor.execute(query)
             self.conn.commit()
-            return self.cursor.fetchall()
+            
+            if hasReturn:
+                return self.cursor.fetchall()
+            else:
+                return
         except Exception as e:
             logger.error(f"Error executing query: {e}")
             raise e

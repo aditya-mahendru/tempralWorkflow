@@ -78,7 +78,8 @@ async def demo_cancellation():
     
     # Cancel the order immediately
     print("Cancelling the order...")
-    await handle.signal(OrderWorkflow.cancel_order)
+    await handle.cancel()
+    # await handle.signal(OrderWorkflow.cancel_order)
     
     # Wait for cancellation
     result = await handle.result()
@@ -102,7 +103,7 @@ async def main():
         print("\n" + "="*50 + "\n")
         
         # Run the cancellation demo
-        await demo_cancellation()
+        # await demo_cancellation()
         
     except Exception as e:
         print(f"Demo failed with error: {e}")

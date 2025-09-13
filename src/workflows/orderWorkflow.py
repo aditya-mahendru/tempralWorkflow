@@ -6,6 +6,7 @@ from activities.orderActivities import order_received, order_validated, payment_
 from workflows.shippingWorkflow import ShippingWorkflow
 from util.dataObject import OrderObject
 from temporalio.workflow import ParentClosePolicy
+from asyncio import CancelledError
 
 import logging
 
@@ -25,7 +26,7 @@ class OrderWorkflow:
         self._workflow_status = "started"
 
     @workflow.run
-    async def run(self, order_id: str, initial_address: str = "Default Address") -> Dict[str, Any]:
+    async def run(self, order_id: str, payment_id:str,initial_address: str = "Default Address") -> Dict[str, Any]:
         """Main order workflow execution"""
         try:
             self._shipping_address = initial_address
@@ -35,8 +36,8 @@ class OrderWorkflow:
             workflow.logger.info(f"Executing order_received activity for order_id: {order_id}")
             self._order_data = await workflow.execute_activity(
                 order_received,
-                order_id,
-                start_to_close_timeout=timedelta(seconds=30),
+                [order_id,payment_id],
+                start_to_close_timeout=timedelta(seconds=60),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=1),
                     maximum_interval=timedelta(minutes=1),
@@ -73,11 +74,11 @@ class OrderWorkflow:
             workflow.logger.info(f"Waiting for manual review for order_id: {order_id}")
             
             # Step 3: Timer for Manual Review (simulated human approval)
-            # self._workflow_status = "awaiting_manual_review"
-            # await workflow.wait_condition(
-            #     lambda: self._manual_review_completed,
-            #     timeout=timedelta(hours=24)  # 24 hour timeout for manual review
-            # )
+            self._workflow_status = "awaiting_manual_review"
+            await workflow.wait_condition(
+                lambda: self._manual_review_completed,
+                timeout=timedelta(seconds=24)  # 24 hour timeout for manual review
+            )
             
             # Check for cancellation after manual review
             if self._is_cancelled:
@@ -90,7 +91,7 @@ class OrderWorkflow:
             workflow.logger.info(f"Executing payment_charged activity for order_id: {order_id}")
             self._payment_result = await workflow.execute_activity(
                 payment_charged,
-                args=[self._order_data, payment_id, "mock_db"],  # db parameter - replace with actual DB connection
+                self._order_data,  # db parameter - replace with actual DB connection
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=2),
@@ -132,9 +133,24 @@ class OrderWorkflow:
                 "shipping_address": self._shipping_address
             }
             
+        except TimeoutError:
+            workflow.logger.info(f"Activity:{self._workflow_status} timed out for order_id: {order_id}")
+            return {"status": "cancelled", "reason": "Activity Timed out!"}
+        
+        except CancelledError:
+            workflow.logger.info(f"Order cancelled for order_id: {order_id}")
+            self._workflow_status = "cancelled"
+            return {"status": "cancelled", "reason": "Order cancelled by user"}
+        
         except Exception as e:
+            # raise e
             self._workflow_status = "failed"
+            if  self._workflow_status == "cancelled":
+                return {"status": "cancelled", "reason": "Order cancelled by user"}
+            if  self._workflow_status == "manual_review_timed_out":
+                return {"status": "manual_review_timed_out", "reason": "Manual review timed out"}
             workflow.logger.info(f"Order failed for order_id: {order_id}")
+            logging.error(e)
             workflow.logger.error(f"Error in {self._workflow_status}: {e}")
             return {
                 "status": "failed",

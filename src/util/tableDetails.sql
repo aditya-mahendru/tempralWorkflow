@@ -1,5 +1,5 @@
 CREATE TABLE orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     order_data jsonb NOT NULL,
     address_json jsonb NOT NULL,
     order_status VARCHAR(255) NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE orders (
 );
 
 CREATE TABLE payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY,
     order_id UUID NOT NULL,
     payment_status int4 NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
